@@ -23,6 +23,7 @@ package net.ccbluex.liquidbounce.utils.client
 
 import net.ccbluex.liquidbounce.event.EventManager
 import net.ccbluex.liquidbounce.event.events.NotificationEvent
+import net.ccbluex.liquidbounce.features.addon.AddonApi
 import net.ccbluex.liquidbounce.features.module.ClientModule
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleHud
 import net.ccbluex.liquidbounce.injection.mixins.minecraft.gui.MixinChatScreenAccessor
@@ -58,12 +59,16 @@ private fun getClientPrefix(): Component = "".asText()
     )
     .append(" ▸ ".asText().withStyle(ChatFormatting.RESET, ChatFormatting.GRAY))
 
+@AddonApi
 fun regular(text: MutableComponent): MutableComponent = text.withStyle(ChatFormatting.GRAY)
 
+@AddonApi
 fun regular(text: String): MutableComponent = text.asText().withStyle(ChatFormatting.GRAY)
 
+@AddonApi
 fun variable(text: MutableComponent): MutableComponent = text.withStyle(ChatFormatting.GOLD)
 
+@AddonApi
 fun variable(text: String): MutableComponent = text.asText().withStyle(ChatFormatting.GOLD)
 
 fun clickablePath(file: File): MutableComponent =
@@ -71,18 +76,24 @@ fun clickablePath(file: File): MutableComponent =
         .onClick(ClickEvent.OpenFile(file))
         .onHover(HoverEvent.ShowText("Open".asPlainText()))
 
+@AddonApi
 fun highlight(text: MutableComponent): MutableComponent = text
     .withStyle(Style.EMPTY + Color4b.LIQUID_BOUNCE + ChatFormatting.BOLD)
 
+@AddonApi
 fun highlight(text: String): MutableComponent = text.asText()
     .withStyle(Style.EMPTY + Color4b.LIQUID_BOUNCE + ChatFormatting.BOLD)
 
+@AddonApi
 fun warning(text: MutableComponent): MutableComponent = text.withStyle(ChatFormatting.YELLOW)
 
+@AddonApi
 fun warning(text: String): MutableComponent = text.asText().withStyle(ChatFormatting.YELLOW)
 
+@AddonApi
 fun markAsError(text: String): MutableComponent = text.asText().withStyle(ChatFormatting.RED)
 
+@AddonApi
 fun markAsError(text: MutableComponent): MutableComponent = text.withStyle(ChatFormatting.RED)
 
 inline fun MutableComponent.withColor(value: ChatFormatting?): MutableComponent =
@@ -190,6 +201,7 @@ private val defaultMessageMetadata = MessageMetadata()
  * from a command named `SomeCommand` with should have the
  * id `SomeCommand#notIngame`.
  */
+@AddonApi
 @JvmRecord
 data class MessageMetadata(
     val prefix: Boolean = true,
@@ -203,6 +215,8 @@ data class MessageMetadata(
     }
 }
 
+@AddonApi
+@JvmOverloads
 fun chat(text: Component, metadata: MessageMetadata = defaultMessageMetadata) {
     val realText = if (metadata.prefix) getClientPrefix().copy().append(text) else text
 
@@ -223,22 +237,33 @@ fun chat(text: Component, metadata: MessageMetadata = defaultMessageMetadata) {
 /**
  * Adds a new chat message.
  */
+@AddonApi
 fun chat(vararg texts: Component, metadata: MessageMetadata = defaultMessageMetadata) {
     chat(texts.asText(), metadata)
 }
 
+@AddonApi
 fun chat(text: Component, module: ClientModule) = chat(text, metadata = MessageMetadata.byModule(module))
 
+@AddonApi
 fun chat(text: String, module: ClientModule) = chat(text.asPlainText(), module)
 
+@AddonApi
 fun chat(text: String) = chat(text.asPlainText())
 
+@AddonApi
 fun notification(title: Component, message: String, severity: NotificationEvent.Severity) =
     EventManager.callEvent(NotificationEvent(title.string, message, severity))
 
+@AddonApi
 fun notification(title: String, message: Component, severity: NotificationEvent.Severity) =
     EventManager.callEvent(NotificationEvent(title, message.string, severity))
 
+@AddonApi
+fun notification(title: Component, message: Component, severity: NotificationEvent.Severity) =
+    EventManager.callEvent(NotificationEvent(title.string, message.string, severity))
+
+@AddonApi
 fun notification(title: String, message: String, severity: NotificationEvent.Severity) =
     EventManager.callEvent(NotificationEvent(title, message, severity))
 

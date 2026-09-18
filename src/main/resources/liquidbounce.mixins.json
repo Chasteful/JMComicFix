@@ -47,6 +47,7 @@
     "minecraft.client.option.MixinServerListAccessor",
     "minecraft.client.renderer.MixinMappableRingBuffer",
     "minecraft.client.renderer.MixinShaderManager",
+    "minecraft.client.sounds.MixinSoundManagerPreparations",
     "minecraft.entity.MixinAbstractClientPlayer",
     "minecraft.entity.MixinAvatar",
     "minecraft.entity.MixinClientAvatarState",
@@ -183,10 +184,6 @@
     "sodium.MixinSodiumAbstractBlockRenderContext",
     "sodium.MixinSodiumBlockRenderer",
     "sodium.MixinSodiumLightDataAccess",
-    "truffle.MixinCallerSensitiveDetection",
-    "truffle.MixinCommonJSRequireBuiltin",
-    "truffle.MixinNpmCompatibleESModuleLoader",
-    "truffle.MixinTruffleLanguage",
     "viaversion.MixinPacketWrapper"
   ],
   "server": [],

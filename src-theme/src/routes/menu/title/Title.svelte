@@ -9,7 +9,8 @@
         exitClient, getClientRelease,
         getClientUpdate,
         openScreen,
-        toggleBackgroundShaderEnabled
+        toggleBackgroundShaderEnabled,
+        toggleBasicMode
     } from "../../../integration/rest";
     import {fly} from "svelte/transition";
     import {onMount} from "svelte";

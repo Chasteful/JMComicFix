@@ -21,7 +21,7 @@ package net.ccbluex.liquidbounce.injection.mixins.minecraft.gui.custom;
 
 import net.ccbluex.liquidbounce.event.EventManager;
 import net.ccbluex.liquidbounce.event.events.OverlayDisconnectionEvent;
-import net.ccbluex.liquidbounce.features.misc.HideAppearance;
+import net.ccbluex.liquidbounce.features.misc.SelfDestruct;
 import net.ccbluex.liquidbounce.injection.mixins.minecraft.gui.MixinScreen;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.DisconnectedScreen;
@@ -64,8 +64,8 @@ public abstract class MixinDisconnectedScreen extends MixinScreen {
     private boolean eventFired = false;
 
     @Inject(method = "init", at = @At("HEAD"))
-    private void injectButtons(final CallbackInfo ci) {
-        if (HideAppearance.INSTANCE.isHidingNow()) {
+    private void injectButtons(final CallbackInfo callback) {
+        if (SelfDestruct.INSTANCE.isDestructed()) {
             return;
         }
 

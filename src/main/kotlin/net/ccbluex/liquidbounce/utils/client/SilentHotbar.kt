@@ -27,6 +27,7 @@ import net.ccbluex.liquidbounce.event.events.SelectHotbarSlotSilentlyEvent
 import net.ccbluex.liquidbounce.event.events.WorldChangeEvent
 import net.ccbluex.liquidbounce.event.events.SelectingHotbarSlotSilentlyEvent
 import net.ccbluex.liquidbounce.event.handler
+import net.ccbluex.liquidbounce.features.addon.AddonApi
 import net.ccbluex.liquidbounce.features.module.modules.world.scaffold.ModuleScaffold
 import net.ccbluex.liquidbounce.utils.inventory.HotbarItemSlot
 import net.minecraft.world.entity.player.Inventory
@@ -36,6 +37,7 @@ import org.jetbrains.annotations.Range
  * Manages things like [ModuleScaffold]'s silent mode.
  * Not thread safe, please only use this on the main-thread of minecraft
  */
+@AddonApi
 object SilentHotbar : EventListener {
 
     private var hotbarState: SilentHotbarState? = null
