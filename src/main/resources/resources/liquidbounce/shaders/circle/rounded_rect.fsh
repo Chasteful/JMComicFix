@@ -1,12 +1,7 @@
 #version 330
+#extension GL_ARB_separate_shader_objects : require
 
-/* #moj_import <minecraft:dynamictransforms.glsl> */
-layout(std140) uniform DynamicTransforms {
-    mat4 ModelViewMat;
-    vec4 ColorModulator;
-    vec3 ModelOffset;
-    mat4 TextureMat;
-};
+#include <minecraft:dynamictransforms.glsl>
 
 layout(std140) uniform u_RoundedRect {
     /** 0..1 (radius in UV[-1,1] space) */
@@ -15,10 +10,10 @@ layout(std140) uniform u_RoundedRect {
     float StrokeWidth;
 };
 
-in vec4 vColor;
-in vec2 vUv;
+layout(location = 0) in vec4 vColor;
+layout(location = 1) in vec2 vUv;
 
-out vec4 fragColor;
+layout(location = 0) out vec4 fragColor;
 
 // quad local half-size in p-space (p is in [-1,1])
 const vec2 HalfSize = vec2(1.0);
@@ -56,7 +51,7 @@ void main() {
         float aa = fwidth(d);                  // AA width
 
         // 1) inside test near edge (d <= 0)
-        float edgeIn = smoothstep(0.0, -aa, d);          // 1 inside, 0 outside
+        float edgeIn = 1.0 - smoothstep(-aa, 0.0, d);    // 1 inside, 0 outside
 
         // 2) cut off deeper than -w (keep only d >= -w)
         float band   = smoothstep(-w - aa, -w + aa, d);  // 0 deep inside, 1 near edge
@@ -64,7 +59,7 @@ void main() {
         alpha = edgeIn * band;
     } else {
         float aa = fwidth(d);
-        alpha = smoothstep(0.0, -aa, d);
+        alpha = 1.0 - smoothstep(-aa, 0.0, d);
     }
 
     color.a *= alpha;

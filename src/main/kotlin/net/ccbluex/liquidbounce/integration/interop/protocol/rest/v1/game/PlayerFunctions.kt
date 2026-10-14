@@ -41,6 +41,7 @@ import net.ccbluex.liquidbounce.utils.session.KilledTarget
 import net.ccbluex.liquidbounce.utils.session.PlayTimeTracker
 import net.ccbluex.liquidbounce.utils.session.PlayerDeadEventListener
 import net.ccbluex.netty.http.routing.Routing
+import net.ccbluex.liquidbounce.utils.text.toText
 import net.minecraft.core.BlockPos
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.numbers.NumberFormat
@@ -185,7 +186,7 @@ data class PlayerInventoryData(
             main = player.inventory.nonEquipmentItems.map(ItemStack::copy),
             crafting = player.inventoryMenu.craftSlots.items.map(ItemStack::copy),
             /** player.enderChestInventory.getHeldStacks().map(ItemStack::copy) */
-            enderChest = EnderChestInventoryTracker.stacks,
+            enderChest = if (player === mc.player) EnderChestInventoryTracker.stacks else [],
             openChest = player.containerMenu.let { handler ->
             if (handler !== player.inventoryMenu) {
                 val containerSize = (handler.slots.size - 36).coerceAtLeast(0)
@@ -205,7 +206,7 @@ data class ScoreboardData(val header: Component, val entries: List<SidebarEntry?
     @JvmRecord
     data class SidebarEntry(val name: Component, val score: Component)
 
-    companion object {
+    companion {
 
         /**
          * Creates a [ScoreboardData] from the players's scoreboard
@@ -215,7 +216,6 @@ data class ScoreboardData(val header: Component, val entries: List<SidebarEntry?
          * @see net.minecraft.client.gui.Hud.extractScoreboardSidebar
          * @see net.minecraft.client.gui.Hud.displayScoreboardSidebar
          */
-        @JvmStatic
         fun fromScoreboard(scoreboard: Scoreboard?): ScoreboardData? {
             scoreboard ?: return null
 
@@ -240,10 +240,13 @@ data class ScoreboardData(val header: Component, val entries: List<SidebarEntry?
                     val entryWithDecoration: Component = PlayerTeam.formatNameForTeam(team, entryName)
                     val entryValue: Component = scoreboardEntry.formatValue(numberFormat)
 
-                    SidebarEntry(entryWithDecoration.sanitizeForeignInput(), entryValue.sanitizeForeignInput())
+                    SidebarEntry(
+                        entryWithDecoration.sanitizeForeignInput().toText(),
+                        entryValue.sanitizeForeignInput().toText(),
+                    )
                 }.asList()
 
-            return ScoreboardData(objective.displayName.sanitizeForeignInput(), sidebarEntries)
+            return ScoreboardData(objective.displayName.sanitizeForeignInput().toText(), sidebarEntries)
         }
     }
 

@@ -1,18 +1,14 @@
 #version 330
+#extension GL_ARB_separate_shader_objects : require
 
-layout(std140) uniform DynamicTransforms {
-    mat4 ModelViewMat;
-    vec4 ColorModulator;
-    vec3 ModelOffset;
-    mat4 TextureMat;
-};
+#include <minecraft:dynamictransforms.glsl>
 
 uniform sampler2D Sampler0;
 
-in vec2 vUv;
-flat in ivec2 vUv2;
+layout(location = 0) in vec2 vUv;
+layout(location = 1) flat in ivec2 vUv2;
 
-out vec4 fragColor;
+layout(location = 0) out vec4 fragColor;
 
 const float TWO_PI = 6.28318530718;
 const float INNER_RATIO_SCALE = 32767.0;
@@ -25,12 +21,12 @@ void main() {
     float innerRatio = clamp(float(vUv2.y) / INNER_RATIO_SCALE, 0.0, 1.0);
     // Match rounded_rect AA strategy: one-sided smoothing inside the shape boundary.
     float dOuter = dist - 1.0;
-    float outerAlpha = smoothstep(0.0, -aa, dOuter);
+    float outerAlpha = 1.0 - smoothstep(-aa, 0.0, dOuter);
 
     float innerAlpha = 1.0;
     if (innerRatio > 0.0) {
         float dInner = innerRatio - dist;
-        innerAlpha = smoothstep(0.0, -aa, dInner);
+        innerAlpha = 1.0 - smoothstep(-aa, 0.0, dInner);
     }
     float alpha = outerAlpha * innerAlpha;
 

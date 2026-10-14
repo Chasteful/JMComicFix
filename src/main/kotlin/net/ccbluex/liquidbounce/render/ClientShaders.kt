@@ -19,8 +19,8 @@
 
 package net.ccbluex.liquidbounce.render
 
-import com.mojang.blaze3d.shaders.ShaderSource
-import com.mojang.blaze3d.shaders.ShaderType
+import com.mojang.renderpearl.api.pipeline.ShaderSource
+import com.mojang.renderpearl.api.pipeline.ShaderType
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap
 import net.ccbluex.liquidbounce.LiquidBounce
 import net.minecraft.resources.Identifier
@@ -92,6 +92,15 @@ sealed class ClientShaders(val type: ShaderType) : ShaderSource {
         val Glow = "glow"("shaders/glow/glow.frag")
 
         @JvmField
+        val ItemChamsEffects = "item_chams_effects"("shaders/item_chams/effects.frag")
+
+        @JvmField
+        val ItemChamsRecolor = "item_chams_recolor"("shaders/item_chams/recolor.frag")
+
+        @JvmField
+        val ItemChamsTrail = "item_chams_trail"("shaders/item_chams/trail.frag")
+
+        @JvmField
         val EntityOutline = "outline"("shaders/outline/entity_outline.frag")
 
         @JvmField
@@ -120,16 +129,24 @@ sealed class ClientShaders(val type: ShaderType) : ShaderSource {
         return k
     }
 
-    override fun get(identifier: Identifier, type: ShaderType): String? {
+    override fun getShader(identifier: Identifier, type: ShaderType): String? {
         if (type != this.type) return null
         return shaders[identifier]
     }
 
-    companion object : ShaderSource {
-        override fun get(identifier: Identifier, shaderType: ShaderType): String? = when (shaderType) {
-            ShaderType.VERTEX -> Vertex[identifier, shaderType]
-            ShaderType.FRAGMENT -> Fragment[identifier, shaderType]
+    override fun getInclude(id: Identifier): ShaderSource.CachedIncludeSource? = null
+
+    override fun close() = Unit
+
+    companion object Source : ShaderSource {
+        override fun getShader(identifier: Identifier, shaderType: ShaderType): String? = when (shaderType) {
+            ShaderType.VERTEX -> Vertex.getShader(identifier, shaderType)
+            ShaderType.FRAGMENT -> Fragment.getShader(identifier, shaderType)
         }
+
+        override fun getInclude(id: Identifier): ShaderSource.CachedIncludeSource? = null
+
+        override fun close() = Unit
     }
 
 }

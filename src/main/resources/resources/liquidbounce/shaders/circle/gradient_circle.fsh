@@ -1,18 +1,14 @@
 #version 330
+#extension GL_ARB_separate_shader_objects : require
 
-layout(std140) uniform DynamicTransforms {
-    mat4 ModelViewMat;
-    vec4 ColorModulator;
-    vec3 ModelOffset;
-    mat4 TextureMat;
-};
+#include <minecraft:dynamictransforms.glsl>
 
-in vec2 vUv;
-flat in ivec2 vOuterPacked;
-flat in ivec2 vInnerPacked;
-in float vInnerRatio;
+layout(location = 0) in vec2 vUv;
+layout(location = 1) flat in ivec2 vOuterPacked;
+layout(location = 2) flat in ivec2 vInnerPacked;
+layout(location = 3) in float vInnerRatio;
 
-out vec4 fragColor;
+layout(location = 0) out vec4 fragColor;
 
 vec4 unpackColor(ivec2 packedColor) {
     int rg = packedColor.x & 0xFFFF;
@@ -31,13 +27,13 @@ void main() {
     float aa = max(fwidth(dist), 1e-4);
 
     float dOuter = dist - 1.0;
-    float outerAlpha = smoothstep(0.0, -aa, dOuter);
+    float outerAlpha = 1.0 - smoothstep(-aa, 0.0, dOuter);
 
     float innerRatio = clamp(vInnerRatio, 0.0, 1.0);
     float innerAlpha = 1.0;
     if (innerRatio > 0.0) {
         float dInner = innerRatio - dist;
-        innerAlpha = smoothstep(0.0, -aa, dInner);
+        innerAlpha = 1.0 - smoothstep(-aa, 0.0, dInner);
     }
 
     float coverage = outerAlpha * innerAlpha;

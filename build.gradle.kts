@@ -20,8 +20,10 @@
 import com.github.gradle.node.npm.task.NpmTask
 import dev.detekt.gradle.DetektCreateBaselineTask
 import groovy.json.JsonOutput
+import java.time.Duration
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.jvm.tasks.Jar
+import org.jetbrains.dokka.gradle.workers.ProcessIsolation
 import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 
 plugins {
@@ -38,6 +40,11 @@ base {
     archivesName = project.property("archives_base_name") as String
     version = project.property("mod_version") as String
     group = project.property("maven_group") as String
+}
+
+dokka {
+    // Dokka Generator runs in its own worker process, so org.gradle.jvmargs does not apply here.
+    (dokkaGeneratorIsolation.get() as ProcessIsolation).maxHeapSize = "4g"
 }
 
 /** Includes dependency recursively in the JAR file */
@@ -91,6 +98,34 @@ loom {
     accessWidenerPath = file("src/main/resources/liquidbounce.accesswidener")
 }
 
+// Client game tests: `src/gametest` is a separate source set/mod, never part of the main jar.
+// Run with `./gradlew runClientGameTest`. Headless, SDL needs EGL, since Xvfb has no sRGB GLX visual:
+// `SDL_VIDEO_FORCE_EGL=1 xvfb-run -a -s "-screen 0 1280x720x24" ./gradlew runClientGameTest`
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = "liquidbounce-gametest"
+        // LiquidBounce is client-only; server game tests would otherwise be wired into `check`.
+        enableGameTests = false
+        eula = true
+    }
+}
+
+// JCEF and the deep learning engine outlive the run directory, which is wiped before every run
+val gameTestLibraries = gradle.gradleUserHomeDir.resolve("liquidbounce-gametest")
+
+loom.runs.named("clientGameTest") {
+    // Keeps the vanilla screens the test API waits for; the browser still starts. Drop it to test the theme UI.
+    systemProperties.put("net.ccbluex.liquidbounce.ui.basicMode", "true")
+    systemProperties.put("net.ccbluex.liquidbounce.browser.libraries", gameTestLibraries.resolve("mcef").path)
+    systemProperties.put("net.ccbluex.liquidbounce.deeplearning.engines", gameTestLibraries.resolve("djl").path)
+}
+
+tasks.named("runClientGameTest") {
+    // A game that cannot start may wait on an error dialog forever
+    timeout = Duration.ofMinutes(10)
+}
+
 dependencies {
     // Minecraft
     minecraft(libs.minecraft)
@@ -129,13 +164,15 @@ dependencies {
     // LWJGL EGL
     jij(libs.lwjgl.egl)
 
-    // JCEF Support
-    api(libs.mcef)
-    include(libs.mcef)
+    // Chromium, through the bundled CEF add-on. It depends on the client, so it stays out of the published POM and
+    // brings nothing along.
+    include(libs.liquidbounce.cef)
+    localRuntime(libs.liquidbounce.cef) { isTransitive = false }
+
 
     // Ktor Server
     jij(libs.ktor.server.core)
-    jij(libs.ktor.server.netty)
+    jij(libs.ktor.server.cio)
     jij(libs.ktor.server.websockets)
     jij(libs.ktor.server.sse)
     jij(libs.ktor.server.cors)
@@ -295,6 +332,9 @@ tasks.test {
         arrayOf(
             // ImmediatelyFast's platform service requires a fully initialized Fabric game process.
             "immediatelyfast",
+            // ViaFabricPlus mixins call its API, which only exists once the mod entrypoint ran.
+            "viafabricplus",
+            "viafabricplus-api",
             // Avoid loading Fabric Language Kotlin's nested Kotlin runtime alongside Gradle's test runtime.
             "org_jetbrains_kotlin_kotlin-reflect",
             "org_jetbrains_kotlin_kotlin-stdlib",
@@ -316,6 +356,8 @@ detekt {
     config.setFrom(file("${rootProject.projectDir}/config/detekt/detekt.yml"))
     buildUponDefaultConfig = true
     baseline = file("${rootProject.projectDir}/config/detekt/baseline.xml")
+    // Defaults only cover src/{main,test}/{java,kotlin}.
+    source.from("src/gametest/kotlin")
 }
 
 tasks.register<DetektCreateBaselineTask>("detektProjectBaseline") {
@@ -357,6 +399,8 @@ kotlin {
     compilerOptions {
         suppressWarnings = true
         jvmToolchain(libs.versions.jdk.get().toInt())
+        freeCompilerArgs.add("-Xcollection-literals")
+        freeCompilerArgs.add("-Xcompanion-blocks-and-extensions")
     }
 
     // Add-ons are compiled against these; `./gradlew updateKotlinAbi` records a deliberate change.

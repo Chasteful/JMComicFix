@@ -20,6 +20,7 @@
 package net.ccbluex.liquidbounce.render.gui.element;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import net.ccbluex.liquidbounce.render.ClientRenderPipelines;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
@@ -38,6 +39,7 @@ public record RoundedRectGuiElementRenderState(
     float y1,
     float radius,
     int fillColor,
+    int fillBottomColor,
     int outlineColor,
     float outlineWidth,
     Matrix3x2f pose,
@@ -60,17 +62,21 @@ public record RoundedRectGuiElementRenderState(
         int encodedRadius = encode(Math.min(radius, Math.min(width, height) * 0.5F));
 
         if (isVisible(fillColor)) {
-            emitQuad(vertices, fillColor, encodedWidth, encodedHeight, encodedRadius, 0.0F);
+            emitQuad(vertices, fillColor, fillBottomColor, encodedWidth, encodedHeight, encodedRadius, 0.0F);
         }
 
         if (isVisible(outlineColor) && outlineWidth > 0.0F) {
-            emitQuad(vertices, outlineColor, encodedWidth, encodedHeight, encodedRadius, outlineWidth);
+            emitQuad(vertices, outlineColor, outlineColor, encodedWidth, encodedHeight, encodedRadius, outlineWidth);
         }
     }
 
+    /**
+     * Vertices are emitted top-down, the shader interpolates {@code Color} between [topColor] and [bottomColor].
+     */
     private void emitQuad(
         VertexConsumer vertices,
-        int color,
+        int topColor,
+        int bottomColor,
         int encodedWidth,
         int encodedHeight,
         int encodedRadius,
@@ -78,32 +84,32 @@ public record RoundedRectGuiElementRenderState(
     ) {
         vertices.addVertexWith2DPose(pose, x0, y0)
             .setUv(0.0F, 0.0F)
-            .setColor(color)
+            .setColor(topColor)
             .setUv1(encodedWidth, encodedHeight)
             .setUv2(encodedRadius, 0)
             .setLineWidth(strokeWidth);
         vertices.addVertexWith2DPose(pose, x0, y1)
             .setUv(0.0F, 1.0F)
-            .setColor(color)
+            .setColor(bottomColor)
             .setUv1(encodedWidth, encodedHeight)
             .setUv2(encodedRadius, 0)
             .setLineWidth(strokeWidth);
         vertices.addVertexWith2DPose(pose, x1, y1)
             .setUv(1.0F, 1.0F)
-            .setColor(color)
+            .setColor(bottomColor)
             .setUv1(encodedWidth, encodedHeight)
             .setUv2(encodedRadius, 0)
             .setLineWidth(strokeWidth);
         vertices.addVertexWith2DPose(pose, x1, y0)
             .setUv(1.0F, 0.0F)
-            .setColor(color)
+            .setColor(topColor)
             .setUv1(encodedWidth, encodedHeight)
             .setUv2(encodedRadius, 0)
             .setLineWidth(strokeWidth);
     }
 
     @Override
-    public com.mojang.blaze3d.pipeline.RenderPipeline pipeline() {
+    public RenderPipeline pipeline() {
         return ClientRenderPipelines.GUI.roundedRect();
     }
 

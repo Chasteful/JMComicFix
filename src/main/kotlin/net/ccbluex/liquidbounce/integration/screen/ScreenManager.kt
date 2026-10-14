@@ -26,6 +26,7 @@ import net.ccbluex.liquidbounce.event.EventManager
 import net.ccbluex.liquidbounce.event.events.BrowserReadyEvent
 import net.ccbluex.liquidbounce.event.events.ClientPlayerEffectEvent
 import net.ccbluex.liquidbounce.event.events.FpsLimitEvent
+import net.ccbluex.liquidbounce.event.events.GameRenderTaskQueueEvent
 import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.KeyboardKeyEvent
 import net.ccbluex.liquidbounce.event.events.ScreenEvent
@@ -37,9 +38,9 @@ import net.ccbluex.liquidbounce.event.waitMatchesWithTimeout
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleClickGui
 import net.ccbluex.liquidbounce.features.module.modules.render.ModuleHud
 import net.ccbluex.liquidbounce.integration.backend.BrowserBackendManager
+import net.ccbluex.liquidbounce.integration.backend.BrowserSelectionScreen
 import net.ccbluex.liquidbounce.integration.backend.browser.Browser
 import net.ccbluex.liquidbounce.integration.backend.browser.BrowserState
-import net.ccbluex.liquidbounce.integration.backend.browser.GlobalBrowserSettings
 import net.ccbluex.liquidbounce.integration.backend.browser.IntegrationBrowserSettings
 import net.ccbluex.liquidbounce.integration.interop.ClientInteropServer
 import net.ccbluex.liquidbounce.integration.screen.impl.CustomSharedMinecraftScreen
@@ -52,13 +53,13 @@ import net.ccbluex.liquidbounce.integration.theme.ThemeManager
 import net.ccbluex.liquidbounce.utils.client.Chronometer
 import net.ccbluex.liquidbounce.utils.client.clientLogger
 import net.ccbluex.liquidbounce.utils.client.error.ErrorHandler
-import net.ccbluex.liquidbounce.utils.client.error.QuickFix
+import net.ccbluex.liquidbounce.utils.client.error.QuickFixes
 import net.ccbluex.liquidbounce.utils.client.inGame
 import net.ccbluex.liquidbounce.utils.client.mc
 import net.ccbluex.liquidbounce.utils.kotlin.EventPriorityConvention
 import net.minecraft.client.gui.screens.Screen
 import net.minecraft.client.gui.screens.TitleScreen
-import org.lwjgl.glfw.GLFW
+import com.mojang.blaze3d.platform.cursor.CursorType
 import kotlin.math.min
 import kotlin.time.Duration.Companion.seconds
 
@@ -113,7 +114,7 @@ object ScreenManager : EventListener {
             } == null) {
             ErrorHandler.fatal(
                 error = IllegalStateException("Timed out waiting for integration browser to initialize."),
-                quickFix = QuickFix.BROWSER_IS_NOT_RESPONDING
+                quickFix = QuickFixes.BROWSER_IS_NOT_RESPONDING
             )
         }
     }
@@ -143,11 +144,11 @@ object ScreenManager : EventListener {
                     "Failed to initialize integration browser. " +
                         "(code='${state.errorCode}', text='${state.errorText}', url='${state.failedUrl}')"
                 ),
-                quickFix = QuickFix.BROWSER_FAILED_TO_LOAD_UI
+                quickFix = QuickFixes.BROWSER_FAILED_TO_LOAD_UI
             )
             else -> ErrorHandler.fatal(
                 error = IllegalStateException("Invalid browser state past wait"),
-                quickFix = QuickFix.BROWSER_IS_NOT_RESPONDING
+                quickFix = QuickFixes.BROWSER_IS_NOT_RESPONDING
             )
         }
     }
@@ -240,8 +241,8 @@ object ScreenManager : EventListener {
      */
     @Suppress("unused")
     private val screenHandler = handler<ScreenEvent> { event ->
-        // Set to default GLFW cursor
-        GLFW.glfwSetCursor(mc.window.handle(), 0)
+        // Set to default cursor
+        mc.window.selectCursor(CursorType.DEFAULT)
 
         if (handleCurrentScreen(event.screen)) {
             event.cancelEvent()
@@ -251,6 +252,21 @@ object ScreenManager : EventListener {
     @Suppress("unused")
     private val screenUpdater = handler<GameTickEvent> {
         handleCurrentScreen(mc.gui.screen())
+    }
+
+    /**
+     * SDL only turns key presses into typed characters while text input is on, and Minecraft turns it on
+     * for its own text fields alone. A browser cannot tell us when one of its inputs is focused, so our
+     * screens keep it on while they are open.
+     */
+    @Suppress("unused")
+    private val textInputHandler = handler<GameRenderTaskQueueEvent> {
+        if (isClientScreen(mc.gui.screen())) {
+            mc.textInputManager().startTextInput(this)
+        } else {
+            // Only stops it if we started it.
+            mc.textInputManager().stopTextInput(this)
+        }
     }
 
     @Suppress("unused")
@@ -283,28 +299,12 @@ object ScreenManager : EventListener {
 
     @Suppress("unused")
     private val keyHandler = handler<KeyboardKeyEvent> { event ->
-        val keyCode = event.keyCode
-        val modifier = event.mods
-
         if (inGame) {
             return@handler
         }
 
-        // F12 to toggle GPU acceleration
-        if (event.isPressed && keyCode == InputConstants.KEY_F12) {
-            val backend = BrowserBackendManager.backend ?: return@handler
-            if (!backend.accelerationFlags.isSupported) {
-                logger.warn("GPU acceleration is not supported by the current browser backend.")
-                return@handler
-            }
-
-            val accelerated = GlobalBrowserSettings.accelerated ?: return@handler
-            accelerated.set(!accelerated.get())
-            logger.info("GPU acceleration is now ${if (accelerated.get()) "enabled" else "disabled"}.")
-        }
-
         // CTRL + 2x SHIFT to toggle basic mode
-        if (keyCode == InputConstants.KEY_LSHIFT && modifier == InputConstants.MOD_CONTROL) {
+        if (event.scanCode == InputConstants.KEY_LSHIFT && event.mods and InputConstants.MOD_CONTROL != 0) {
             if (!basicModeChronometer.hasElapsed(400L)) {
                 ThemeManager.basicMode = !ThemeManager.basicMode
                 ConfigSystem.store(ThemeManager)
@@ -317,6 +317,10 @@ object ScreenManager : EventListener {
     private fun handleCurrentScreen(screen: Screen?): Boolean {
         // We check against mc.gui.screen(), not screen, because somehow this works.
         if (mc.gui.screen() is TaskProgressScreen) {
+            return false
+        }
+
+        if (screen is BrowserSelectionScreen || mc.gui.screen() is BrowserSelectionScreen) {
             return false
         }
 

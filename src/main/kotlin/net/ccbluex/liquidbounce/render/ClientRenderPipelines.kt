@@ -20,14 +20,15 @@
 @file:Suppress("NOTHING_TO_INLINE", "TooManyFunctions")
 package net.ccbluex.liquidbounce.render
 
-import com.mojang.blaze3d.GpuFormat
-import com.mojang.blaze3d.PrimitiveTopology
-import com.mojang.blaze3d.pipeline.BindGroupLayout
-import com.mojang.blaze3d.pipeline.BlendFunction
-import com.mojang.blaze3d.pipeline.ColorTargetState
-import com.mojang.blaze3d.pipeline.DepthStencilState
-import com.mojang.blaze3d.pipeline.RenderPipeline
+import com.mojang.renderpearl.api.GpuFormat
+import com.mojang.renderpearl.api.pipeline.PrimitiveTopology
+import com.mojang.renderpearl.api.pipeline.BindGroupLayout
+import com.mojang.renderpearl.api.pipeline.BlendFunction
+import com.mojang.renderpearl.api.pipeline.ColorTargetState
+import com.mojang.renderpearl.api.pipeline.DepthStencilState
+import com.mojang.renderpearl.api.pipeline.RenderPipeline
 import com.mojang.blaze3d.vertex.DefaultVertexFormat
+import com.mojang.renderpearl.api.pipeline.UniformType
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap
 import net.ccbluex.fastutil.fastIterator
 import net.ccbluex.liquidbounce.LiquidBounce
@@ -37,15 +38,11 @@ import net.ccbluex.liquidbounce.utils.kotlin.optional
 import net.minecraft.client.renderer.BindGroupLayouts
 import net.minecraft.client.renderer.RenderPipelines
 import net.minecraft.resources.Identifier
+import net.minecraft.util.Util
 
 object ClientRenderPipelines {
 
     private val renderPipelines = Object2ObjectOpenHashMap<Identifier, RenderPipeline>()
-
-    /**
-     * Blend mode for JCEF compatible blending.
-     */
-    private val JCEF_COMPATIBLE_BLEND = BlendFunction.TRANSLUCENT_PREMULTIPLIED_ALPHA
 
     internal inline fun newPipeline(
         name: String,
@@ -56,12 +53,14 @@ object ClientRenderPipelines {
             .withLocation(id)
             .apply(builderAction)
             .build().also { r ->
+                RenderPipelines.register(r)
                 renderPipelines.put(id, r)?.let { error("Duplicated render pipeline: $id") }
             }
     }
 
     private inline fun RenderPipeline.Builder.bgraPosTexColorQuads() {
-        withBindGroupLayout(BindGroupLayouts.MATRICES_PROJECTION)
+        withBindGroupLayout(BindGroupLayouts.DYNAMIC_TRANSFORMS)
+        withBindGroupLayout(BindGroupLayouts.PROJECTION)
         withVertexShader("core/position_tex_color")
         withFragmentShader(ClientShaders.Fragment.BgraPosTex)
         withBindGroupLayout(BindGroupLayouts.SAMPLER0)
@@ -71,6 +70,9 @@ object ClientRenderPipelines {
 
     inline fun RenderPipeline.Builder.withBindGroupLayout(block: BindGroupLayout.Builder.() -> Unit) =
         this.withBindGroupLayout(BindGroupLayout.builder().apply(block).build())
+
+    inline fun BindGroupLayout.Builder.withSampler(name: String) =
+        this.withUniform(name, UniformType.COMBINED_IMAGE_SAMPLER)
 
     inline fun BindGroupLayout.Builder.withUniformBuffer(define: ClientUniformDefine) = define.appendTo(this)
 
@@ -108,48 +110,18 @@ object ClientRenderPipelines {
         withPrimitiveTopology(mode)
     }
 
-    object JCEF {
+    // Browsers paint with premultiplied alpha
+    object BROWSER {
         @JvmField
-        val SMOOTH_TEXTURE = newPipeline("jcef/smooth_texture") {
+        val Texture = newPipeline("browser/texture") {
             withSnippet(RenderPipelines.GUI_TEXTURED_SNIPPET)
-            withColorTargetState(ColorTargetState(BlendFunction.TRANSLUCENT))
-            withDepthStencilState(optional())
+            withColorTargetState(ColorTargetState(BlendFunction.TRANSLUCENT_PREMULTIPLIED_ALPHA))
         }
 
         @JvmField
-        val BLURRED_TEXTURE = newPipeline("jcef/blurred_texture") {
-            withSnippet(RenderPipelines.GUI_TEXTURED_SNIPPET)
-            withColorTargetState(ColorTargetState(JCEF_COMPATIBLE_BLEND))
-        }
-
-        @JvmField
-        val BGRA_TEXTURE = newPipeline("jcef/bgra_texture") {
+        val BgraTexture = newPipeline("browser/bgra_texture") {
             bgraPosTexColorQuads()
-            withColorTargetState(ColorTargetState(JCEF_COMPATIBLE_BLEND))
-        }
-
-        @JvmField
-        val BGRA_BLURRED_TEXTURE = newPipeline("jcef/bgra_blurred_texture") {
-            bgraPosTexColorQuads()
-            withColorTargetState(ColorTargetState(JCEF_COMPATIBLE_BLEND))
-        }
-
-        /**
-         * @see RenderPipelines.ENTITY_OUTLINE_BLIT
-         */
-        @JvmField
-        val Blit = newPipeline("jcef_blit") {
-            screenQuadSnippet()
-            withFragmentShader("core/blit_screen")
-            withBindGroupLayout(BindGroupLayouts.IN_SAMPLER)
-            withColorTargetState(
-                ColorTargetState(
-                    optional(JCEF_COMPATIBLE_BLEND),
-                    GpuFormat.RGBA8_UNORM,
-                    ColorTargetState.WRITE_COLOR,
-                )
-            )
-            withDepthStencilState(optional())
+            withColorTargetState(ColorTargetState(BlendFunction.TRANSLUCENT_PREMULTIPLIED_ALPHA))
         }
     }
 
@@ -193,6 +165,13 @@ object ClientRenderPipelines {
         private val TrianglesNoCull = newPipeline("gui/triangles_no_cull") {
             guiPosColorSnippet(PrimitiveTopology.TRIANGLES)
             withCull(false)
+        }
+
+        @JvmField
+        val SmoothTexture = newPipeline("gui/smooth_texture") {
+            withSnippet(RenderPipelines.GUI_TEXTURED_SNIPPET)
+            withColorTargetState(ColorTargetState(BlendFunction.TRANSLUCENT))
+            withDepthStencilState(optional())
         }
 
         @JvmField
@@ -336,7 +315,7 @@ object ClientRenderPipelines {
         withPrimitiveTopology(PrimitiveTopology.QUADS)
         withUniformBuffer(ClientUniformDefine.MESH_BASE_BLOCK_POS)
         withUniformBuffer(ClientUniformDefine.DISTANCE_FADE)
-        withColorTargetState(ColorTargetState(BlendFunction.TRANSLUCENT))
+        forWorldRender()
     }
 
     private val OutlineQuadsNoColor = newPipeline("outline_quads_no_color") {
@@ -347,7 +326,7 @@ object ClientRenderPipelines {
         withPrimitiveTopology(PrimitiveTopology.QUADS)
         withUniformBuffer(ClientUniformDefine.MESH_BASE_BLOCK_POS)
         withUniformBuffer(ClientUniformDefine.DISTANCE_FADE)
-        withColorTargetState(ColorTargetState(BlendFunction.TRANSLUCENT))
+        forWorldRender()
     }
 
     @JvmStatic
@@ -491,6 +470,65 @@ object ClientRenderPipelines {
         withDepthStencilState(optional())
     }
 
+    /**
+     * Additive effect layer (flow, trail, glow, chromatic, scanlines) drawn over the held item.
+     */
+    @JvmField
+    val ItemChamsEffects = newPipeline("item_chams/effects") {
+        screenQuadSnippet()
+        withFragmentShader(ClientShaders.Fragment.ItemChamsEffects)
+        withBindGroupLayout {
+            withSampler("capture")
+            withSampler("depthTex")
+            withSampler("trail")
+            withUniformBuffer(ClientUniformDefine.ITEM_CHAMS_EFFECTS)
+        }
+        withColorTargetState(ColorTargetState(BlendFunction.ADDITIVE))
+        withDepthStencilState(optional())
+    }
+
+    /**
+     * Recovers the held item from the capture with an animated hue/brightness shift.
+     */
+    @JvmField
+    val ItemChamsRecolor = newPipeline("item_chams/recolor") {
+        screenQuadSnippet()
+        withFragmentShader(ClientShaders.Fragment.ItemChamsRecolor)
+        withBindGroupLayout {
+            withSampler("capture")
+            withSampler("depthTex")
+            withUniformBuffer(ClientUniformDefine.ITEM_CHAMS_EFFECTS)
+        }
+        withColorTargetState(ColorTargetState(BlendFunction.TRANSLUCENT))
+        withDepthStencilState(optional())
+    }
+
+    /**
+     * Accumulates the captured held item into the trail history buffer with decay.
+     */
+    @JvmField
+    val ItemChamsTrail = newPipeline("item_chams/trail") {
+        screenQuadSnippet()
+        withFragmentShader(ClientShaders.Fragment.ItemChamsTrail)
+        withBindGroupLayout {
+            withSampler("capture")
+            withSampler("depthTex")
+            withSampler("history")
+            withUniformBuffer(ClientUniformDefine.ITEM_CHAMS_EFFECTS)
+        }
+        withColorTargetState(ColorTargetState.DEFAULT)
+        withDepthStencilState(optional())
+    }
+
+    @JvmField
+    val ChamsBlit: RenderPipeline = newPipeline("chams/blit") {
+        screenQuadSnippet()
+        withFragmentShader("core/blit_screen")
+        withBindGroupLayout(BindGroupLayouts.IN_SAMPLER)
+        withColorTargetState(ColorTargetState(BlendFunction.TRANSLUCENT))
+        withDepthStencilState(optional())
+    }
+
     @JvmField
     val GuiBlurH = newPipeline("blur_h") {
         screenQuadSnippet()
@@ -519,6 +557,24 @@ object ClientRenderPipelines {
         withDepthStencilState(optional())
     }
 
+    /**
+     * @see RenderPipelines.ENTITY_OUTLINE_BLIT
+     */
+    @JvmField
+    val GuiBlurBlit = newPipeline("blur_blit") {
+        screenQuadSnippet()
+        withFragmentShader("core/blit_screen")
+        withBindGroupLayout(BindGroupLayouts.IN_SAMPLER)
+        withColorTargetState(
+            ColorTargetState(
+                optional(BlendFunction.TRANSLUCENT_PREMULTIPLIED_ALPHA),
+                GpuFormat.RGBA8_UNORM,
+                ColorTargetState.WRITE_COLOR,
+            )
+        )
+        withDepthStencilState(optional())
+    }
+
     @JvmField
     val Blend = newPipeline("blend") {
         withVertexShader(ClientShaders.Vertex.PlainPosTex)
@@ -536,13 +592,13 @@ object ClientRenderPipelines {
      * Precompile
      */
     fun precompile() {
-        JCEF
+        BROWSER
         GUI
 
         renderPipelines.fastIterator().forEach { (_, pipeline) ->
-            gpuDevice.precompilePipeline(pipeline, ClientShaders)
+            gpuDevice.compilePipeline(pipeline, ClientShaders, Util.backgroundExecutor())
         }
-        logger.info("Loaded ${renderPipelines.size} Render Pipelines.")
+        logger.info("Registered ${renderPipelines.size} Render Pipelines.")
     }
 
 }

@@ -6,7 +6,7 @@
     import type {NotificationEvent, NotificationSeverity} from "../../../../integration/events";
     import { Howl } from "howler";
     import { onDestroy } from "svelte";
-    import type { HudNotificationsSettings } from "../../components";
+    import type {HudNotificationsSettings} from "../../components";
 
     interface TNotification {
         animationKey: number;

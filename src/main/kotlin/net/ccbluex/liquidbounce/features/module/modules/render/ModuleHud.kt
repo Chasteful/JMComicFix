@@ -24,6 +24,7 @@ import net.ccbluex.liquidbounce.config.types.group.ValueGroup
 import net.ccbluex.liquidbounce.event.EventManager
 import net.ccbluex.liquidbounce.event.events.BrowserReadyEvent
 import net.ccbluex.liquidbounce.event.events.DisconnectEvent
+import net.ccbluex.liquidbounce.event.events.GameTickEvent
 import net.ccbluex.liquidbounce.event.events.HudValueChangeEvent
 import net.ccbluex.liquidbounce.event.events.ScreenEvent
 import net.ccbluex.liquidbounce.event.events.SpaceSeperatedNamesChangeEvent
@@ -62,6 +63,16 @@ object ModuleHud : ClientModule("HUD", ModuleCategories.RENDER, state = true, hi
     private val isVisible: Boolean
         get() = inGame
 
+    /**
+     * Whether the player toggled the vanilla HUD off (F1): vanilla then skips its whole HUD pass, so the
+     * overlay render event the web HUD is drawn with never fires and open screens would paint it instead.
+     */
+    private val isHudHidden: Boolean
+        get() = mc.gui.hud.isHidden
+
+    /** [isHudHidden] as of the last visibility evaluation, so the tick handler only reacts to changes. */
+    private var lastHudHidden = false
+
     var hudEditorSelected = false
         set(value) {
             if (value != field) {
@@ -71,7 +82,8 @@ object ModuleHud : ClientModule("HUD", ModuleCategories.RENDER, state = true, hi
         }
 
     private fun shouldShowOverlay(screen: Screen?): Boolean =
-        screen !is DisconnectedScreen &&
+        !isHudHidden &&
+            screen !is DisconnectedScreen &&
             screen !is LevelLoadingScreen &&
             !(hudEditorSelected && isClickGuiScreen(screen))
 
@@ -80,12 +92,17 @@ object ModuleHud : ClientModule("HUD", ModuleCategories.RENDER, state = true, hi
             screen is CustomStandaloneMinecraftScreen && screen.screenType == CustomScreenType.CLICK_GUI
 
     private fun updateOverlayVisibility(screen: Screen?) {
+        lastHudHidden = isHudHidden
+
         if (!enabled || !isVisible) {
             overlay.close()
             return
         }
 
-        overlay.visible = shouldShowOverlay(screen)
+        val shouldBeVisible = shouldShowOverlay(screen)
+        if (overlay.visible != shouldBeVisible) {
+            overlay.visible = shouldBeVisible
+        }
     }
 
     private var overlay = CustomOverlay(
@@ -148,7 +165,7 @@ object ModuleHud : ClientModule("HUD", ModuleCategories.RENDER, state = true, hi
         get() = customization.clientName
 
     val isBlurEffectActive
-        get() = Blur.enabled && !(mc.gui.hud.isHidden && mc.gui.screen() == null)
+        get() = Blur.enabled && !(isHudHidden && mc.gui.screen() == null)
 
     val themes = tree(ValueGroup("Themes"))
 
@@ -195,6 +212,16 @@ object ModuleHud : ClientModule("HUD", ModuleCategories.RENDER, state = true, hi
     @Suppress("unused")
     private val screenHandler = handler<ScreenEvent> { event ->
         updateOverlayVisibility(event.screen)
+    }
+
+    /**
+     * The toggle fires no event and is only processed while no screen is open, so follow it on tick.
+     */
+    @Suppress("unused")
+    private val tickHandler = handler<GameTickEvent> {
+        if (isHudHidden != lastHudHidden) {
+            updateOverlayVisibility(mc.gui.screen())
+        }
     }
 
     @Suppress("unused")

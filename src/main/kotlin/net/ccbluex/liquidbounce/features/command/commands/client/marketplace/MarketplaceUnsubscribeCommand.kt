@@ -18,10 +18,9 @@
  */
 package net.ccbluex.liquidbounce.features.command.commands.client.marketplace
 
-import com.mojang.brigadier.arguments.IntegerArgumentType
+import net.ccbluex.liquidbounce.features.command.arguments.ClientStringArgumentType
 import net.ccbluex.liquidbounce.features.command.brigadier.CmdLiteralScope
 import net.ccbluex.liquidbounce.features.command.brigadier.get
-import net.ccbluex.liquidbounce.features.command.brigadier.suggestions
 import net.ccbluex.liquidbounce.features.marketplace.MarketplaceManager
 import net.ccbluex.liquidbounce.utils.client.chat
 import net.ccbluex.liquidbounce.utils.client.regular
@@ -34,21 +33,12 @@ object MarketplaceUnsubscribeCommand {
 
     fun CmdLiteralScope.unsubscribe() {
         literal("unsubscribe") {
-            argument(
-                "id",
-                IntegerArgumentType.integer(1),
-                suggestions { MarketplaceManager.subscribedItems.map { it.id.toString() } },
-            ) { id ->
+            argument("item", ClientStringArgumentType.string(), suggests = subscribedSuggestions) { input ->
                 execSuspend { ctx ->
-                    val itemId = ctx.get(id)
+                    val item = subscribedItem(ctx.get(input))
 
-                    if (!MarketplaceManager.isSubscribed(itemId)) {
-                        chat(regular(t("unsubscribe.notSubscribed", variable(itemId.toString()))))
-                        return@execSuspend
-                    }
-
-                    MarketplaceManager.unsubscribe(itemId)
-                    chat(regular(t("unsubscribe.success", variable(itemId.toString()))))
+                    MarketplaceManager.unsubscribe(item.id)
+                    chat(regular(t("unsubscribe.success", variable(item.address))))
                 }
             }
         }

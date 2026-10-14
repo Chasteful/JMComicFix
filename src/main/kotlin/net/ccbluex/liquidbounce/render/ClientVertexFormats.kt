@@ -31,7 +31,7 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat.UV1_FORMAT
 import com.mojang.blaze3d.vertex.DefaultVertexFormat.UV1_SEMANTIC_NAME
 import com.mojang.blaze3d.vertex.DefaultVertexFormat.UV2_FORMAT
 import com.mojang.blaze3d.vertex.DefaultVertexFormat.UV2_SEMANTIC_NAME
-import com.mojang.blaze3d.vertex.VertexFormat
+import com.mojang.renderpearl.api.vertex.VertexFormat
 
 object ClientVertexFormats {
 
@@ -39,7 +39,7 @@ object ClientVertexFormats {
      * Vertex format for GUI rounded rectangle shader.
      *
      * - UV0: Quad-local UV (0..1). Shader maps this into rect-local coordinates for SDF evaluation.
-     * - Color: Fill or outline color.
+     * - Color: Fill color, interpolated from the top to the bottom edge. Strokes keep it solid.
      * - Size: Rect width/height encoded in UV1.x/UV1.y.
      * - Parameters: Corner radius encoded in UV2.x. UV2.y is reserved for future flags.
      * - StrokeWidth: Outline width in rect-local GUI units. 0 means fill.

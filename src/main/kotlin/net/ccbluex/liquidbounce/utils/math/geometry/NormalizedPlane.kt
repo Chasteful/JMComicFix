@@ -27,6 +27,12 @@ class NormalizedPlane(val pos: Vec3, normalVec: Vec3) {
 
     val normalVec: Vec3 = normalVec.normalizeIfNeeded()
 
+    init {
+        require(!this.normalVec.isLikelyZero) {
+            "Normal vector must be not zero, actual: $normalVec"
+        }
+    }
+
     fun intersectionPhi(geometry: LinearGeometry3): Double? {
         val d = pos.dot(normalVec)
         val e = geometry.direction.dot(normalVec)
@@ -62,13 +68,11 @@ class NormalizedPlane(val pos: Vec3, normalVec: Vec3) {
         return Line(point, direction)
     }
 
-    companion object {
-        @JvmStatic
+    companion {
         fun fromPoints(a: Vec3, b: Vec3, c: Vec3): NormalizedPlane {
             return fromParams(a, b.subtract(a), c.subtract(a))
         }
 
-        @JvmStatic
         fun fromParams(base: Vec3, directionA: Vec3, directionB: Vec3): NormalizedPlane {
             val normalVec = directionA.cross(directionB).normalize()
 

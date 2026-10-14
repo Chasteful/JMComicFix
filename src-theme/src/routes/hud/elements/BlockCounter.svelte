@@ -7,6 +7,7 @@
     import {blockCount} from './island/Island';
     import {cubicOut} from "svelte/easing";
     import {Tween} from "svelte/motion";
+    import type {HudBlockCounterSettings} from "../components";
 
     export let settings: { [name: string]: any };
 
